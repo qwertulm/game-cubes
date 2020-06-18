@@ -1,0 +1,211 @@
+<head><script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script></head>
+<body>
+<script type="text/javascript">
+
+const FIELD_SIZE = 20;
+const OPTIONS_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
+function getRandomChar(options = OPTIONS_LETTERS) {
+    return options[Math.floor(Math.random() * options.length)];
+}
+
+//кооридинаты блока, на который кликнули в прошлый раз
+prevSwapСoordinates = {row: -1, column: -1};
+
+function swapQuery(element) {
+    id = Number(element.id.replace('td_', ''));
+    row = tableIds.findIndex(x => x.includes(id));
+    column = tableIds[row].indexOf(id);
+    console.log(row, column, prevSwapСoordinates)
+    if ((row == prevSwapСoordinates.row && Math.abs(column - prevSwapСoordinates.column) == 1) ||
+        (column == prevSwapСoordinates.column && Math.abs(row - prevSwapСoordinates.row) == 1)) {
+        swap(row, column, prevSwapСoordinates.row, prevSwapСoordinates.column);
+        prevSwapСoordinates = {row: -1, column: -1};
+    } else {
+        prevSwapСoordinates = {row: row, column: column};
+    }
+}
+// меняем местами блоки
+function swap(row1, column1, row2, column2) {
+    element1 = document.getElementById('td_' + tableIds[row1][column1]);
+    element2 = document.getElementById('td_' + tableIds[row2][column2]);
+    letter1 = element1.getAttribute('letter');
+    letter2 = element2.getAttribute('letter');
+
+    // меняем местами буквы блоков
+    element1.setAttribute("letter", letter2);
+    element2.setAttribute("letter", letter1);
+
+    clearLongLine();
+}
+
+//ищем несколько одиноковых блоков под ряд и удаляем
+function clearLongLine() {
+	// помечаем одинаковые блоки
+    for (let row = 2; row < FIELD_SIZE; row++) {
+        for (let column = 0; column < FIELD_SIZE; column++) {
+            let currentElement  = document.getElementById('td_' + tableIds[row    ][column]);
+            let prewElement     = document.getElementById('td_' + tableIds[row - 1][column]);
+            let prewPrewElement = document.getElementById('td_' + tableIds[row - 2][column]);
+
+            if (currentElement.getAttribute('letter') == prewElement.getAttribute('letter') &&
+                currentElement.getAttribute('letter') == prewPrewElement.getAttribute('letter')) 
+            {
+                prewPrewElement.className = "deleted";
+                prewElement    .className = "deleted";
+                currentElement .className = "deleted";
+            }
+        }
+    }
+    for (let row = 0; row < FIELD_SIZE; row++) {
+        for (let column = 2; column < FIELD_SIZE; column++) {
+            let currentElement  = document.getElementById('td_' + tableIds[row][column    ]);
+            let prewElement     = document.getElementById('td_' + tableIds[row][column - 1]);
+            let prewPrewElement = document.getElementById('td_' + tableIds[row][column - 2]);
+
+            if (currentElement.getAttribute('letter') == prewElement    .getAttribute('letter') &&
+                currentElement.getAttribute('letter') == prewPrewElement.getAttribute('letter')) 
+            {
+                prewPrewElement.className = "deleted";
+                prewElement    .className = "deleted";
+                currentElement .className = "deleted";
+            }
+        }
+    }
+    // удаляем помеченные блоки
+    if (deleteMarkedCells()) {
+    	// таймер нужен для анимации, если что-то удалилось нужно заполнить пустые места и еще раз проверить на совпадения
+        setTimeout(function() {
+        	// заполняем пустые месте, где были удалены блока
+            fillEmptyCells();
+            // возможно после первого удаления появились повторения блоков в ряду, ищем еще раз (рекурсивно)
+            clearLongLine();
+        }, 1000);
+
+    }
+
+
+}
+
+function deleteMarkedCells() {
+    let elementsDeteted = false;
+    for (let row = 0; row < FIELD_SIZE; row++) {
+        for (let column = 0; column < FIELD_SIZE; column++) {
+            let currentElement = document.getElementById('td_' + tableIds[row][column]);
+            if (currentElement !== null && currentElement.className == "deleted") {
+            	// удаляем блок с анимацией
+                $(currentElement).slideUp('1000', function() {$(this).remove();});
+                tableIds[row].splice(column, 1);;
+                elementsDeteted = true;
+                column--;
+            }
+        }
+    }
+    return elementsDeteted;
+}
+
+function fillEmptyCells() {
+    for (let row = 0; row < FIELD_SIZE; row++) {
+        for (let column = 0; column < FIELD_SIZE; column++) {
+            let currentElement = document.getElementById('td_' + tableIds[row][column]);
+            // если блок был удален делаем новый
+            if (currentElement === null) {
+                let tr = document.getElementById("tr_" + row);
+                let td = document.createElement("td");
+                let id = getNewId();
+                td.id = "td_" + id;
+                tableIds[row][column] = id;
+                td.setAttribute("letter", getRandomChar(getRandomChar()));
+                td.setAttribute("onclick", "swapQuery(this);");
+                tr.appendChild(td);
+            }
+        }
+    }
+}
+
+let lastId = 0;
+function getNewId() {
+    lastId++;
+    return lastId;
+}
+
+let table = document.createElement("table");
+document.body.appendChild(table);
+
+// id элементов в таблице, нужны чтобы легче было к ним обращаться
+let tableIds = new Array(FIELD_SIZE);
+// заполняем таблицу в начале игры случайными блоками
+for (let row = 0; row < FIELD_SIZE; row++) {
+    tableIds[row] = new Array(FIELD_SIZE);
+    let tr = document.createElement("tr");
+    tr.id = "tr_" + row;
+    table.appendChild(tr);
+
+    for (let column = 0; column < FIELD_SIZE; column++) {
+        let td = document.createElement("td");
+        let id = getNewId();
+        td.id = "td_" + id;
+        tableIds[row][column] = id;
+        optionsLetter = OPTIONS_LETTERS.slice();
+
+        // проверяем, если уже есть 2 одинаковых буквы под ряд, 3 такую же не ставим
+        if (row >= 2) {
+            let prewLetter = document.getElementById('td_' + tableIds[row - 1][column]).getAttribute('letter');
+            let prewPrewLetter = document.getElementById('td_' + tableIds[row - 2][column]).getAttribute('letter');
+
+            if (prewLetter == prewPrewLetter) {
+                var index = optionsLetter.indexOf(prewLetter);
+                if (index > -1) optionsLetter.splice(index, 1);
+            }
+        }
+        if (column >= 2) {
+            let prewLetter = document.getElementById('td_' + tableIds[row][column - 1]).getAttribute('letter');
+            let prewPrewLetter = document.getElementById('td_' + tableIds[row][column - 2]).getAttribute('letter');
+
+            if (prewLetter == prewPrewLetter) {
+                var index = optionsLetter.indexOf(prewLetter);
+                if (index > -1) optionsLetter.splice(index, 1);
+            }
+        }
+
+        td.setAttribute("letter", getRandomChar(optionsLetter));
+        td.setAttribute("onclick", "swapQuery(this);");
+        tr.appendChild(td);
+
+    }
+
+}
+</script>
+
+<style type="text/css">
+    table {
+        transform: rotate(-90deg);
+        width: 30%;
+        margin-top: 1%;
+        margin-left: 35%;
+    }
+
+    td {
+        width: 5%;
+        position: relative;
+        cursor: pointer;
+    }
+    td:after {
+        content: '';
+        display: block;
+        margin-top: 100%;
+    }   
+    td.deleted {
+        background-image: url("deleted.png");
+        background-size: cover;
+    }
+	td[letter='A'] { background-color: #FF3300; }
+	td[letter='B'] { background-color: #FFCC00; }
+	td[letter='C'] { background-color: #009900; }
+	td[letter='D'] { background-color: #006666; }
+	td[letter='E'] { background-color: #0066FF; }
+	td[letter='F'] { background-color: #0000CC; }
+	td[letter='G'] { background-color: #663399; }
+	td[letter='H'] { background-color: #CC0099; }
+</style>
+</body>
